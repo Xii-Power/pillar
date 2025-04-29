@@ -1,0 +1,21 @@
+server:
+  port: 8000
+  servlet:
+    context-path: /pillar
+  tomcat:
+    uri-encoding: UTF-8
+    connection-timeout: 20000
+    max-connections: 10000
+    accept-count: 1024
+    threads:
+      max: 1024
+      min-spare: 50
+
+spring:
+  profiles:
+    active: ${Environment:dev}
+  main:
+    allow-bean-definition-overriding: true
+  http:
+    encoding:
+      charset: UTF-8

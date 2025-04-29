@@ -1,0 +1,24 @@
+logging:
+  config: classpath:log4j2-local.xml
+
+spring:
+  main:
+    allow-bean-definition-overriding: true
+    allow-circular-references: true
+  http:
+    encoding:
+      charset: UTF-8
+  data:
+    mongodb:
+      uri: 'mongodb://wf_admin:workflow666@127.0.0.1:27017/workflow_db?authSource=workflow_db'
+
+
+decomposition:
+  priority:
+    gen-step: 100
+    insert-step: 10
+
+mission:
+  priority:
+    gen-step: 100
+    insert-step: 10
