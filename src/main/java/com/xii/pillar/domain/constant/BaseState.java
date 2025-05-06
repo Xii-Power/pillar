@@ -8,9 +8,10 @@ public enum BaseState {
     // workflow state
     PENDING,
     IN_PROGRESS,
-    WAIT,
     FINISHED,
     FAIL,
+
+    // session state
     CANCEL,
     BREAK,
 }

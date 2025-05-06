@@ -3,11 +3,17 @@ package com.xii.pillar.domain.snapshot;
 import com.xii.pillar.domain.constant.BaseState;
 import com.xii.pillar.domain.constant.ExecutionMode;
 import com.xii.pillar.domain.workflow.PredictionPath;
+import com.xii.pillar.utils.IdGenerator;
 import org.springframework.data.mongodb.core.mapping.Document;
+
+import java.util.List;
+
+import static com.xii.pillar.domain.constant.GlobalConstant.SCAN_MODE_IDLE;
 
 @Document("execution_path")
 public class ExecutionPath {
     private String id;
+    private String nodeId;
     private String pathId;
     private String nodeSnapshotId;
     private Long createAt;
@@ -16,9 +22,11 @@ public class ExecutionPath {
     // IN_PROGRESS, FINISHED, CANCEL
     private BaseState state;
     private Integer priority;
+    private String scanMode;
 
     private ExecutionMode executionMode;
     private PredictionPath.PathType pathType;
+    private List<String> taskIds;
 
     // path defined
     private String condition;
@@ -30,6 +38,15 @@ public class ExecutionPath {
 
     public ExecutionPath setId(String id) {
         this.id = id;
+        return this;
+    }
+
+    public String getNodeId() {
+        return nodeId;
+    }
+
+    public ExecutionPath setNodeId(String nodeId) {
+        this.nodeId = nodeId;
         return this;
     }
 
@@ -87,6 +104,15 @@ public class ExecutionPath {
         return this;
     }
 
+    public String getScanMode() {
+        return scanMode;
+    }
+
+    public ExecutionPath setScanMode(String scanMode) {
+        this.scanMode = scanMode;
+        return this;
+    }
+
     public ExecutionMode getExecutionMode() {
         return executionMode;
     }
@@ -102,6 +128,15 @@ public class ExecutionPath {
 
     public ExecutionPath setPathType(PredictionPath.PathType pathType) {
         this.pathType = pathType;
+        return this;
+    }
+
+    public List<String> getTaskIds() {
+        return taskIds;
+    }
+
+    public ExecutionPath setTaskIds(List<String> taskIds) {
+        this.taskIds = taskIds;
         return this;
     }
 
@@ -121,5 +156,26 @@ public class ExecutionPath {
     public ExecutionPath setExploratoryPluginName(String exploratoryPluginName) {
         this.exploratoryPluginName = exploratoryPluginName;
         return this;
+    }
+
+    public static ExecutionPath transfer(PredictionPath path, String nodeSnapshotId) {
+        return new ExecutionPath()
+                .setId(IdGenerator.uuid())
+                .setState(BaseState.IN_PROGRESS)
+                .setScanMode(SCAN_MODE_IDLE)
+                .setNodeId(path.getNodeId())
+                .setPathId(path.getId())
+                .setTaskIds(path.getTaskIds())
+                .setNodeSnapshotId(nodeSnapshotId)
+                .setExecutionMode(path.getExecutionMode())
+                .setCondition(path.getCondition())
+                .setPriority(path.getPriority())
+                .setExecutionMode(path.getExecutionMode())
+                .setExploratoryPluginName(path.getExploratoryPluginName())
+                .setPathType(path.getPathType())
+                .setCreateAt(System.currentTimeMillis())
+                .setUpdateAt(System.currentTimeMillis())
+                .setPathId(path.getId())
+                ;
     }
 }

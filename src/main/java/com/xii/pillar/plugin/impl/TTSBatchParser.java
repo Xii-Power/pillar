@@ -5,11 +5,12 @@ import com.xii.pillar.domain.snapshot.PTaskSnapshot;
 import com.xii.pillar.plugin.ExploratoryPlugin;
 import com.xii.pillar.schema.PContext;
 import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import java.util.Collections;
 import java.util.List;
 
-@Component
+@Service("TTSBatchParser")
 public class TTSBatchParser implements ExploratoryPlugin {
 
 
