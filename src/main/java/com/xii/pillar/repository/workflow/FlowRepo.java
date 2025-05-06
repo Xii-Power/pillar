@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 public class FlowRepo extends BasicRepo {
 
     public boolean updateState(String id, BaseState state) {
-        UpdateResult updateResult = mongoTemplate.updateFirst(Query.query(Criteria.where("_id").is(id)),
+        UpdateResult updateResult = updateFirst(Criteria.where("_id").is(id),
                 Update.update("status", state).set("updateAt", System.currentTimeMillis()), PFlow.class);
         return updateResult.getModifiedCount() > 0;
     }

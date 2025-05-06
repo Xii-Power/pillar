@@ -1,6 +1,7 @@
 package com.xii.pillar.controller;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.xii.pillar.domain.constant.NodeType;
 import com.xii.pillar.domain.workflow.PFlow;
 import com.xii.pillar.domain.workflow.PNode;
 import com.xii.pillar.domain.workflow.PTask;
@@ -49,6 +50,8 @@ public class WorkFlowController {
     @ResponseBody
     public PNode addOrUpdateNode(HttpServletRequest request, @RequestBody PNode node) {
         if (ObjectUtils.isEmpty(node.getId())) {
+            if (isExist(node)) return null;
+
             PNode newNode = new PNode(node.getFlowId(), node.getName(), node.getPreNodeIds(), node.getNodeType());
             nodeRepo.save(newNode);
             return newNode;
@@ -56,6 +59,15 @@ public class WorkFlowController {
 
         nodeRepo.updateNode(node.getId(), node.getPreNodeIds());
         return node;
+    }
+
+    private boolean isExist(PNode node) {
+        if (node.getNodeType() != NodeType.start && node.getNodeType() != NodeType.end) {
+            return false;
+        }
+
+        PNode pNode = nodeRepo.findNodeByType(node.getFlowId(), node.getNodeType());
+        return pNode != null;
     }
 
     @RequestMapping(value = "/wf/task", method = RequestMethod.POST)

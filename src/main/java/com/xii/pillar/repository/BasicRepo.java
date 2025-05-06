@@ -1,6 +1,7 @@
 package com.xii.pillar.repository;
 
 import com.mongodb.bulk.BulkWriteResult;
+import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.InvalidDataAccessApiUsageException;
@@ -71,6 +72,12 @@ public class BasicRepo {
         Query query = new Query();
         query.addCriteria(criteria);
         mongoTemplate.updateMulti(query, update, clazz);
+    }
+
+    public <T> DeleteResult deleteById(String id, Class<T> clazz) {
+        Query query = new Query();
+        query.addCriteria(Criteria.where("_id").is(id));
+        return mongoTemplate.remove(query, clazz);
     }
 
     public <T> T findOne(Criteria criteria, Class<T> clazz) {

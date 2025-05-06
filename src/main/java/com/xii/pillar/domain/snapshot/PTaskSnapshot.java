@@ -3,6 +3,9 @@ package com.xii.pillar.domain.snapshot;
 import com.xii.pillar.domain.constant.BaseState;
 import com.xii.pillar.domain.constant.ErrorOption;
 import com.xii.pillar.domain.constant.TaskType;
+import com.xii.pillar.domain.workflow.PTask;
+import com.xii.pillar.utils.IdGenerator;
+import org.springframework.beans.BeanUtils;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.io.Serializable;
@@ -205,6 +208,19 @@ public class PTaskSnapshot implements Serializable {
     public PTaskSnapshot setEndAt(Long endAt) {
         this.endAt = endAt;
         return this;
+    }
+
+    public static PTaskSnapshot transfer(PTask task, String executionPathId) {
+        PTaskSnapshot taskSnapshot = new PTaskSnapshot();
+        BeanUtils.copyProperties(taskSnapshot, task);
+        return taskSnapshot
+                .setId(IdGenerator.uuid())
+                .setState(BaseState.IN_PROGRESS)
+                .setExecutionPathId(executionPathId)
+                .setTaskId(task.getId())
+                .setExpireAt(task.getExpireTime() == null ? null : System.currentTimeMillis() + task.getExpireTime())
+                .setRemainNum(task.getMaxRetryNum())
+                .setCreateAt(System.currentTimeMillis());
     }
 }
 

@@ -2,23 +2,32 @@ package com.xii.pillar.domain.snapshot;
 
 import com.xii.pillar.domain.constant.BaseState;
 import com.xii.pillar.domain.constant.NodeType;
+import com.xii.pillar.domain.workflow.PNode;
+import com.xii.pillar.utils.IdGenerator;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+
+import static com.xii.pillar.domain.constant.GlobalConstant.PRE_SNAPSHOT;
 
 @Document("p_node_snapshot")
 public class PNodeSnapshot implements Serializable {
     private String id;
     private String nodeId;
     private String flowSnapshotId;
+    private String sessionId;
     private String name;
+    // PENDING, IN_PROGRESS, FINISHED, FAIL
     private BaseState state;
     private ArrayList<String> preNodeSnapshotIds;
     private NodeType nodeType;
 
     private Long createAt;
     private Long updateAt;
+
+    public PNodeSnapshot() {
+    }
 
     public String getId() {
         return id;
@@ -44,6 +53,15 @@ public class PNodeSnapshot implements Serializable {
 
     public PNodeSnapshot setFlowSnapshotId(String flowSnapshotId) {
         this.flowSnapshotId = flowSnapshotId;
+        return this;
+    }
+
+    public String getSessionId() {
+        return sessionId;
+    }
+
+    public PNodeSnapshot setSessionId(String sessionId) {
+        this.sessionId = sessionId;
         return this;
     }
 
@@ -99,5 +117,20 @@ public class PNodeSnapshot implements Serializable {
     public PNodeSnapshot setUpdateAt(Long updateAt) {
         this.updateAt = updateAt;
         return this;
+    }
+
+    public static PNodeSnapshot transfer(PNode node, String flowSnapshotId, String sessionId) {
+        return new PNodeSnapshot()
+                .setId(IdGenerator.uuid())
+                .setName(PRE_SNAPSHOT + node.getName())
+                .setNodeId(node.getId())
+                .setFlowSnapshotId(flowSnapshotId)
+                .setSessionId(sessionId)
+                .setNodeType(node.getNodeType())
+                .setPreNodeSnapshotIds(node.getPreNodeIds())
+                .setState(BaseState.PENDING)
+                .setCreateAt(System.currentTimeMillis())
+                .setUpdateAt(System.currentTimeMillis())
+                ;
     }
 }
