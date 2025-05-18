@@ -1,6 +1,7 @@
 package com.xii.pillar.repository.workflow;
 
 import com.mongodb.client.result.UpdateResult;
+import com.xii.pillar.domain.constant.ErrorOption;
 import com.xii.pillar.domain.workflow.PTask;
 import com.xii.pillar.repository.BasicRepo;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -18,13 +19,17 @@ public class TaskRepo extends BasicRepo {
         return getObjects(Criteria.where("_id").in(ids), PTask.class);
     }
 
-    public boolean updateTask(String id, HashMap<String, String> contextParser, HashMap<String, String> params) {
+    public boolean updateTask(String id, ErrorOption errorOption, HashMap<String, String> contextParser, HashMap<String, String> params) {
         Update update = Update.update("updateAt", System.currentTimeMillis());
-        if (ObjectUtils.isEmpty(contextParser)) {
+        if (!ObjectUtils.isEmpty(errorOption)) {
+            update.set("errorOption", errorOption);
+        }
+
+        if (!ObjectUtils.isEmpty(contextParser)) {
             update.set("contextParser", contextParser);
         }
 
-        if (ObjectUtils.isEmpty(params)) {
+        if (!ObjectUtils.isEmpty(params)) {
             update.set("params", params);
         }
 

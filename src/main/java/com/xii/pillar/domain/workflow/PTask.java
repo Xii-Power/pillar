@@ -11,12 +11,11 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.io.Serializable;
 import java.util.HashMap;
 
-import static com.xii.pillar.domain.constant.GlobalConstant.MAX_RETRY_NUM;
-
 @Slf4j
 @Document("p_task")
 public class PTask implements Serializable {
     private String id;
+    private String displayName;
     private String name;
     // context.param
     private HashMap<String, String> contextParser;
@@ -44,6 +43,15 @@ public class PTask implements Serializable {
 
     public PTask setId(String id) {
         this.id = id;
+        return this;
+    }
+
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public PTask setDisplayName(String displayName) {
+        this.displayName = displayName;
         return this;
     }
 
@@ -160,16 +168,17 @@ public class PTask implements Serializable {
         try {
             task = new PTask()
                     .setId(IdGenerator.uuid())
+                    .setDisplayName(JsonUtil.getString(objectNode, "displayName", null))
                     .setName(JsonUtil.getString(objectNode, "name", null))
                     .setErrorOption(objectNode.has("errorOption") ? ErrorOption.valueOf(objectNode.get("errorOption").asText()) : ErrorOption.BREAK)
                     .setTaskType(objectNode.has("taskType") ? TaskType.valueOf(objectNode.get("taskType").asText()) : null)
-                    .setParams(objectNode.has("params") ? JsonUtil.read(objectNode.get("params").asText(), HashMap.class) : null)
-                    .setContextParser(objectNode.has("contextParser") ? JsonUtil.read(objectNode.get("contextParser").asText(), HashMap.class) : null)
+                    .setParams(objectNode.has("params") ? JsonUtil.read(objectNode.get("params").toString(), HashMap.class) : null)
+                    .setContextParser(objectNode.has("contextParser") ? JsonUtil.read(objectNode.get("contextParser").toString(), HashMap.class) : null)
                     .setDeviceId(JsonUtil.getString(objectNode, "deviceId", null))
                     .setCallbackUrl(JsonUtil.getString(objectNode, "callbackUrl", null))
                     .setUrl(JsonUtil.getString(objectNode, "url", null))
-                    .setExpireTime(JsonUtil.getLong(objectNode, "expireTime", null))
-                    .setMaxRetryNum(JsonUtil.getInt(objectNode, "maxRetryNum", MAX_RETRY_NUM))
+                    .setExpireTime(JsonUtil.getLong(objectNode, "expireTime", 0l))
+                    .setMaxRetryNum(JsonUtil.getInt(objectNode, "maxRetryNum", 0))
                     .setCreateAt(System.currentTimeMillis())
                     .setUpdateAt(System.currentTimeMillis());
         } catch (Exception e) {

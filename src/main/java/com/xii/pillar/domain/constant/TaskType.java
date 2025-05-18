@@ -17,6 +17,7 @@ public enum TaskType {
     endpoint_audio_play,
 
     db_query,
+    function_call,
 
     request_rpc,
     request_http,
@@ -26,7 +27,7 @@ public enum TaskType {
     topic_message_parser,
     ;
 
-    final static List<TaskType> syncTasks = Arrays.asList(db_query, request_rpc, request_http);
+    final static List<TaskType> syncTasks = Arrays.asList(db_query, request_rpc, request_http, function_call);
     public boolean isSync() {
         return syncTasks.contains(this);
     }
