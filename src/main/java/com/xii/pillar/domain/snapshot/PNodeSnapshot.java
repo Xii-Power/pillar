@@ -8,6 +8,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.List;
 
 import static com.xii.pillar.domain.constant.GlobalConstant.PRE_SNAPSHOT;
 
@@ -119,7 +120,8 @@ public class PNodeSnapshot implements Serializable {
         return this;
     }
 
-    public static PNodeSnapshot transfer(PNode node, String flowSnapshotId, String sessionId) {
+    public static PNodeSnapshot transfer(PNode node, List<String> preNodeSnapshotIds,
+                                         String flowSnapshotId, String sessionId) {
         return new PNodeSnapshot()
                 .setId(IdGenerator.uuid())
                 .setName(PRE_SNAPSHOT + node.getName())
@@ -127,7 +129,7 @@ public class PNodeSnapshot implements Serializable {
                 .setFlowSnapshotId(flowSnapshotId)
                 .setSessionId(sessionId)
                 .setNodeType(node.getNodeType())
-                .setPreNodeSnapshotIds(node.getPreNodeIds())
+                .setPreNodeSnapshotIds((ArrayList<String>) preNodeSnapshotIds)
                 .setState(BaseState.PENDING)
                 .setCreateAt(System.currentTimeMillis())
                 .setUpdateAt(System.currentTimeMillis())

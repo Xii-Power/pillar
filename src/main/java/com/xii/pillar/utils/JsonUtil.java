@@ -93,7 +93,7 @@ public class JsonUtil {
         return objectNode.has(key) ? objectNode.get(key).asInt() : defaultValue;
     }
 
-    public static Long getLong(ObjectNode objectNode, String key, Long defaultValue) {
-        return objectNode.has(key) ? objectNode.get(key).asLong() : defaultValue;
+    public static Long getLong(ObjectNode node, String key, Long defaultValue) {
+        return node.has(key) ? node.get(key).asLong() : defaultValue;
     }
 }

@@ -1,7 +1,7 @@
 package com.xii.pillar.connect;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.xii.pillar.service.PillarApplicationContextHolder;
+import com.xii.pillar.service.config.PillarApplicationContextHolder;
 import com.xii.pillar.service.endpoint.MessageReportService;
 import com.xii.pillar.utils.ParamUtil;
 import lombok.extern.slf4j.Slf4j;

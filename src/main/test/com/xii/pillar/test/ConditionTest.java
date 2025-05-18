@@ -9,7 +9,7 @@ import java.util.Map;
 public class ConditionTest {
 
     public final static String message = "{\"model\":\"ds\",\"prompt\":\"who are you?\",\"stream\":false}";
-    public final static String conditionStr = "abc.code == '1' && abc.message.model == 'ds'";
+    public final static String conditionStr = "task_id.code == '1' && task_id.message.model == 'ds'";
 
     public static void testMatcher() throws Exception {
         Map<String, Object> abc = new HashMap<String, Object>();
@@ -19,7 +19,7 @@ public class ConditionTest {
         String message = JsonUtil.write(abc);
         Map<String, Object> env = new HashMap<String, Object>();
 
-        env.put("abc", JsonUtil.read(message, HashMap.class));
+        env.put("task_id", JsonUtil.read(message, HashMap.class));
         System.out.println(AviatorEvaluator.execute(conditionStr, env));
     }
 
@@ -27,6 +27,5 @@ public class ConditionTest {
         long start = System.currentTimeMillis();
         testMatcher();
         System.out.println(System.currentTimeMillis() - start);
-
     }
 }

@@ -32,13 +32,13 @@ public class SessionHolder {
     }
 
 
-    public static String getSessionId(WebSocketSession session) {
+    public static String getConnectedDeviceId(WebSocketSession session) {
         String deviceId = (String) session.getAttributes().get("deviceId");
         return deviceId;
     }
 
     public static void add(WebSocketSession session, ConnectorType connector) {
-        String deviceId = getSessionId(session);
+        String deviceId = getConnectedDeviceId(session);
         if (deviceId == null) {
             return ;
         }
@@ -48,7 +48,7 @@ public class SessionHolder {
     }
 
     public static void remove(WebSocketSession session, ConnectorType connector) {
-        String deviceId = getSessionId(session);
+        String deviceId = getConnectedDeviceId(session);
         if (ObjectUtils.isEmpty(deviceId)) {
             return ;
         }
@@ -104,6 +104,6 @@ public class SessionHolder {
     }
 
     private static String getKey(WebSocketSession session, ConnectorType connector) {
-        return connector.name() + getSessionId(session);
+        return connector.name() + getConnectedDeviceId(session);
     }
 }

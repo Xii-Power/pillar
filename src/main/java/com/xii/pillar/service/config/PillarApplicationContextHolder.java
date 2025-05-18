@@ -1,4 +1,4 @@
-package com.xii.pillar.service;
+package com.xii.pillar.service.config;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeansException;

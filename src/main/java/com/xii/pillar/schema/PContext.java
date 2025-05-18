@@ -5,8 +5,9 @@ import java.util.HashMap;
 
 public class PContext implements Serializable {
     private String inputText;
+    private String deviceId;
 
-    private HashMap<String, Object> sessionMap;
+    private HashMap<String, Object> sessionMap = new HashMap<>();
 
     public String getInputText() {
         return inputText;
@@ -14,6 +15,15 @@ public class PContext implements Serializable {
 
     public PContext setInputText(String inputText) {
         this.inputText = inputText;
+        return this;
+    }
+
+    public String getDeviceId() {
+        return deviceId;
+    }
+
+    public PContext setDeviceId(String deviceId) {
+        this.deviceId = deviceId;
         return this;
     }
 

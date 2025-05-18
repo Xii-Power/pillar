@@ -16,7 +16,10 @@ import com.xii.pillar.repository.snapshot.NodeSnapshotRepo;
 import com.xii.pillar.repository.snapshot.TaskSnapshotRepo;
 import com.xii.pillar.repository.workflow.PredictionPathRepo;
 import com.xii.pillar.repository.workflow.TaskRepo;
+import com.xii.pillar.schema.PContext;
 import com.xii.pillar.schema.PException;
+import com.xii.pillar.service.config.PillarApplicationContextHolder;
+import com.xii.pillar.service.config.SessionContextService;
 import com.xii.pillar.service.task.PTaskService;
 import com.xii.pillar.utils.GlobalThreadPool;
 import com.xii.pillar.utils.JsonUtil;
@@ -28,8 +31,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
+import static com.xii.pillar.domain.constant.ErrorOption.RETRY;
+import static com.xii.pillar.domain.constant.GlobalConstant.*;
 import static org.springframework.util.ObjectUtils.isEmpty;
 
 @Slf4j
@@ -48,9 +52,26 @@ public class TaskDispatcher {
     @Autowired
     private TaskRepo taskRepo;
 
+    /**
+     * Scan IN_PROGRESS path
+     */
+    public void scanPath() {
+        List<ExecutionPath> paths = executionPathRepo.scanByState(BaseState.IN_PROGRESS);
+        for (ExecutionPath path : paths) {
+            GlobalThreadPool.execute(() -> {
+                try {
+                    ExecutionPath executionPath = dispatchExecutionPath(path.getId());
+                    if (executionPath != null) executionPathRepo.toIdleMode(executionPath.getId());
+                } catch (Exception e) {
+                    log.error("# DISPATCH_PATH_ERROR. id:{}, nodeId:{}", path.getId(), path.getNodeId(), e);
+                }
+            });
+            log.info("# SCAN_PATH. id:{}", path.getId());
+        }
+    }
 
     /**
-     * check path for the nodeSnapshot state
+     * Check execution path for node state
      * @param nodeSnapshot
      * @return
      */
@@ -71,27 +92,42 @@ public class TaskDispatcher {
     }
 
     /**
-     * scan and dispatch
+     * Dispatch tasks of the ExecutionPath
+     *
+     * @param pathId
      * @return
+     * @throws Exception
      */
-    public boolean dispatchNodePath() throws Exception {
+    public ExecutionPath dispatchExecutionPath(String pathId) throws Exception {
         // select path
-        ExecutionPath currentPath = executionPathRepo.selectOne(BaseState.IN_PROGRESS);
-        if (currentPath == null) return false;
+        ExecutionPath currentPath = executionPathRepo.selectOne(pathId, BaseState.IN_PROGRESS);
+        if (currentPath == null) throw new PException(NODE_ERROR_NULL, "No path in progress");
 
         Map<String, Object> conditionParams = new HashMap<>();
-        boolean isFinish = checkAndUpdatePath(currentPath.getId(), conditionParams);
+        BaseState state = checkPathState(currentPath.getId(), conditionParams);
 
-        if(!isFinish) {
-            log.info("# PATH_EXECUTING. pathId:{}", currentPath.getId());
-            return true;
+        if (BaseState.PENDING == state) {
+            executePath(nodeSnapshotRepo.getById(currentPath.getNodeSnapshotId(), PNodeSnapshot.class), currentPath);
+            log.info("# PATH_DISPATCHED. id:{}", currentPath.getId());
+            return currentPath;
         }
 
-        if (conditionParams.isEmpty()) {
-            executionPathRepo.updateState(currentPath.getId(), BaseState.FINISHED);
-            return true;
+        if(BaseState.IN_PROGRESS == state) {
+            log.info("# PATH_IN_PROGRESS. id:{}", currentPath.getId());
+            return currentPath;
         }
 
+        if (BaseState.FINISHED == state && conditionParams.isEmpty()) {
+            log.info("# PATH_FINISHED. id:{}", currentPath.getId());
+            return executionPathRepo.updateState(currentPath.getId(), BaseState.FINISHED);
+        }
+
+        if (BaseState.CANCEL == state && conditionParams.isEmpty()) {
+            log.info("# PATH_CANCELED. id:{}", currentPath.getId());
+            return executionPathRepo.updateState(currentPath.getId(), BaseState.CANCEL);
+        }
+
+        log.info("# PATH_RE_PLAN. id:{}, conditionParams:{}", pathId, conditionParams);
         // process task fail
         List<PredictionPath> paths = predictionPathRepo.getByNodeId(currentPath.getNodeId());
         ExecutionPath newPath = null;
@@ -109,46 +145,14 @@ public class TaskDispatcher {
         if(newPath == null){
             executionPathRepo.updateState(currentPath.getId(), BaseState.CANCEL);
             log.info("# EXECUTE_ALL_PATH_FAIL. nodeId: {}", currentPath.getNodeId());
-            return true;
+            return currentPath;
         }
 
         // RePlan and create new path for node
         executionPathRepo.updateState(currentPath.getId(), BaseState.CANCEL);
-        executionPathRepo.save(newPath);
+        executionPathRepo.save(newPath.setScanMode(SCAN_MODE_SELECTED));
         executePath(nodeSnapshotRepo.getById(currentPath.getNodeSnapshotId(), PNodeSnapshot.class), newPath);
-        return true;
-    }
-
-    private boolean checkAndUpdatePath(String executionPathId, Map<String, Object> conditionParams) throws Exception {
-        boolean isFinish = true;
-        List<PTaskSnapshot> taskSnapshots = taskSnapshotRepo.getByPathId(executionPathId);
-        for (PTaskSnapshot taskSnapshot : taskSnapshots) {
-            // FAIL
-            if (taskSnapshot.getState() == BaseState.FAIL) {
-                if (taskSnapshot.getErrorOption() == ErrorOption.BREAK) {
-                    executionPathRepo.updateState(executionPathId, BaseState.CANCEL);
-                    break;
-                }
-
-                if (taskSnapshot.getErrorOption() == ErrorOption.RE_PLAN) {
-                    HashMap matcherCase = JsonUtil.read(taskSnapshot.getMessage(), HashMap.class);
-                    matcherCase.put("returnCode", taskSnapshot.getReturnCode());
-                    conditionParams.put(taskSnapshot.getTaskId(), matcherCase);
-                }
-                continue;
-            }
-
-            if (taskSnapshot.getState() != BaseState.IN_PROGRESS) continue;
-            // IN_PROGRESS
-            if (!isEmpty(taskSnapshot.getExpireAt()) && taskSnapshot.getExpireAt() > System.currentTimeMillis()) {
-                taskSnapshotRepo.updateState(taskSnapshot.getId(), BaseState.FAIL);
-                continue;
-            }
-
-            isFinish = false;
-        }
-
-        return isFinish;
+        return newPath;
     }
 
     public void executePath(PNodeSnapshot pNodeSnapshot, ExecutionPath executionPath) {
@@ -158,25 +162,34 @@ public class TaskDispatcher {
             return;
         }
 
-        List<PTask> tasks = new ArrayList<>();
+        List<String> taskIds = new ArrayList<>();
         switch (executionPath.getPathType()) {
             case general:
             case predict:
-                tasks = taskRepo.getByIds(executionPath.getTaskIds());
+                taskIds = executionPath.getTaskIds();
                 break;
             case explore:
                 // generate task
                 ExploratoryPlugin plugin = (ExploratoryPlugin) PillarApplicationContextHolder.getBean(executionPath.getExploratoryPluginName());
-                List<String> taskIds = plugin.explore(sessionContextService.getById(pNodeSnapshot.getSessionId()), pNodeSnapshot, null);
-                tasks = isEmpty(taskIds) ? tasks : taskRepo.getByIds(taskIds);
+                taskIds = plugin.explore(executionPath, sessionContextService.getById(pNodeSnapshot.getSessionId()), pNodeSnapshot);
                 break;
         }
+        List<PTask> tasks = isEmpty(taskIds) ? null :taskRepo.getByIds(taskIds);
         if(isEmpty(tasks)) {
             log.info("# NO_TASK. executionPathId:{}", executionPath.getId());
             return;
         }
 
-        taskSnapshots = tasks.stream().map(t -> PTaskSnapshot.transfer(t, executionPath.getId())).collect(Collectors.toList());
+        log.info("# CREATE_TASKS. {}", tasks.size());
+        taskSnapshots = new ArrayList<>();
+
+        long createAt = System.currentTimeMillis();
+        for (String taskId : taskIds) {
+            taskSnapshots.add(PTaskSnapshot.transfer(
+                    tasks.stream().filter(t -> taskId.equals(t.getId())).findFirst().get(),
+                    executionPath.getId(), createAt));
+            createAt = createAt + 1000;
+        }
         taskSnapshotRepo.insertAll(taskSnapshots);
 
         // parallel
@@ -188,26 +201,93 @@ public class TaskDispatcher {
         // serial
         for (PTaskSnapshot taskSnapshot : taskSnapshots) {
             boolean isOK = triggerTask(taskSnapshot, pNodeSnapshot.getSessionId());
+            if (!isOK && ErrorOption.isContinue(taskSnapshot.getErrorOption())) {
+                log.info("# TASK_ERROR_IGNORE. {}, id:{}", taskSnapshot.getDisplayName(), taskSnapshot.getId());
+                continue;
+            }
+
+
             if (!isOK || !taskSnapshot.getTaskType().isSync()){
                 break;
             }
         }
     }
 
+
+    private BaseState checkPathState(String executionPathId, Map<String, Object> conditionParams) throws Exception {
+        BaseState state = BaseState.FINISHED;
+        List<PTaskSnapshot> taskSnapshots = taskSnapshotRepo.getByPathId(executionPathId);
+        if (isEmpty(taskSnapshots)) return BaseState.PENDING;
+
+        for (PTaskSnapshot taskSnapshot : taskSnapshots) {
+            // FAIL
+            if (taskSnapshot.getState() == BaseState.FAIL) {
+                if (taskSnapshot.getErrorOption() == ErrorOption.BREAK) {
+                    state = BaseState.CANCEL;
+                    break;
+                }
+
+                // prepare conditions for RE_PLAN TASK
+                if (ErrorOption.isRePlan(taskSnapshot.getErrorOption())) {
+                    HashMap matcherCase = isEmpty(taskSnapshot.getMessage())
+                            ? new HashMap<>() : JsonUtil.read(taskSnapshot.getMessage(), HashMap.class);
+                    matcherCase.put("returnCode", taskSnapshot.getReturnCode());
+                    conditionParams.put(PRE_TASK_CONDITION + taskSnapshot.getTaskId(), matcherCase);
+                    state = taskSnapshot.getErrorOption() == ErrorOption.RE_PLAN_NOW ?
+                            BaseState.CANCEL : BaseState.IN_PROGRESS;
+                }
+                continue;
+            }
+
+            if (taskSnapshot.getState() != BaseState.IN_PROGRESS) continue;
+
+            // check IN_PROGRESS task expired time
+            if (taskSnapshot.getExpireAt() != 0l && taskSnapshot.getExpireAt() > System.currentTimeMillis()) {
+                taskSnapshotRepo.updateState(taskSnapshot.getId(), BaseState.IN_PROGRESS, BaseState.FAIL);
+                continue;
+            }
+
+            state = BaseState.IN_PROGRESS;
+        }
+
+        return state;
+    }
+
+
     private boolean triggerTask(PTaskSnapshot taskSnapshot, String sessionId) {
         PTaskService taskService = (PTaskService) PillarApplicationContextHolder.getBean(taskSnapshot.getName());
         boolean isOK = false;
         try {
+            // prepare
             isOK = taskService.prepare(taskSnapshot, sessionId);
-            if(isOK)
-                isOK = taskService.start(taskSnapshot, sessionId);
 
-            if (isOK && taskSnapshot.getTaskType().isSync())
+            // start
+            if(isOK) {
+                taskSnapshotRepo.updateState(taskSnapshot.getId(), BaseState.PENDING, BaseState.IN_PROGRESS);
+                isOK = taskService.start(taskSnapshot, sessionId);
+                while (!isOK && RETRY.equals(taskSnapshot.getErrorOption()) && taskSnapshot.getRemainNum() > 0) {
+                    taskSnapshot = taskSnapshot.setRemainNum(taskSnapshot.getRemainNum() - 1);
+                    isOK = taskService.start(taskSnapshot, sessionId);
+                }
+
+                if (!isOK) taskSnapshotRepo.rePlanSnapshot(taskSnapshot.setState(BaseState.FAIL));
+            }
+
+            // end
+            if (isOK) {
+                PContext context = sessionContextService.getById(sessionId);
+                HashMap sessionMap = context.getSessionMap();
+                sessionMap.put(taskSnapshot.getName(), taskSnapshot.getMessage());
+                sessionContextService.setById(sessionId, context.setSessionMap(sessionMap));
                 isOK = taskService.end(taskSnapshot, sessionId);
+            }
+
+            if (isOK) taskSnapshotRepo.endSnapshot(taskSnapshot);
 
         } catch (PException e) {
             log.error("# TRIGGER_TASK_ERROR. sessionId:{}, taskSnapshot:{}", sessionId, taskSnapshot, e);
         }
+
         return isOK;
     }
 

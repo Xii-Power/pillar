@@ -16,12 +16,14 @@ public class PTaskSnapshot implements Serializable {
     private String id;
     private String taskId;
     private String executionPathId;
+    private String displayName;
     private String name;
     private HashMap<String, String> contextParser = new HashMap<>();
     private HashMap<String, String> params = new HashMap<>();
     private ErrorOption errorOption;
     private TaskType taskType;
     private Long createAt;
+    // PENDING,  IN_PROGRESS, FINISHED, FAIL
     private BaseState state;
 
     // task defined
@@ -63,6 +65,15 @@ public class PTaskSnapshot implements Serializable {
 
     public PTaskSnapshot setExecutionPathId(String executionPathId) {
         this.executionPathId = executionPathId;
+        return this;
+    }
+
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public PTaskSnapshot setDisplayName(String displayName) {
+        this.displayName = displayName;
         return this;
     }
 
@@ -210,17 +221,17 @@ public class PTaskSnapshot implements Serializable {
         return this;
     }
 
-    public static PTaskSnapshot transfer(PTask task, String executionPathId) {
+    public static PTaskSnapshot transfer(PTask task, String executionPathId, long createAt) {
         PTaskSnapshot taskSnapshot = new PTaskSnapshot();
-        BeanUtils.copyProperties(taskSnapshot, task);
+        BeanUtils.copyProperties(task, taskSnapshot);
         return taskSnapshot
                 .setId(IdGenerator.uuid())
-                .setState(BaseState.IN_PROGRESS)
+                .setState(BaseState.PENDING)
                 .setExecutionPathId(executionPathId)
                 .setTaskId(task.getId())
                 .setExpireAt(task.getExpireTime() == null ? null : System.currentTimeMillis() + task.getExpireTime())
                 .setRemainNum(task.getMaxRetryNum())
-                .setCreateAt(System.currentTimeMillis());
+                .setCreateAt(createAt);
     }
 }
 
